@@ -550,8 +550,18 @@ pub fn App() -> Element {
     }
 
     rsx! {
-        // Favicon
+        // Favicon. The SVG stays the tab icon. The PNG icons and the
+        // manifest are what a browser needs before it will offer Install.
+        // The Freenet shell is the top-level page, so this link only applies
+        // inside the contract document until the shell points at the same
+        // manifest.
         Link { rel: "icon", r#type: "image/svg+xml", href: asset!("/assets/river_logo.svg") }
+        Link { rel: "manifest", href: "manifest.webmanifest" }
+        Link { rel: "apple-touch-icon", href: "icons/apple-touch-icon.png" }
+        Meta { name: "theme-color", content: "#0a0a0b" }
+        Meta { name: "mobile-web-app-capable", content: "yes" }
+        Meta { name: "apple-mobile-web-app-capable", content: "yes" }
+        Meta { name: "apple-mobile-web-app-title", content: "River" }
         // Stylesheets
         Stylesheet { href: asset!("/assets/styles.css") }
         Stylesheet { href: asset!("/assets/main.css") }
