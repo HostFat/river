@@ -558,6 +558,9 @@ pub fn App() -> Element {
         Link { rel: "icon", r#type: "image/svg+xml", href: asset!("/assets/river_logo.svg") }
         Link { rel: "manifest", href: "manifest.webmanifest" }
         Link { rel: "apple-touch-icon", href: "icons/apple-touch-icon.png" }
+        // Dioxus's Meta component cannot set the `media` attribute, so one
+        // theme-color has to match the manifest splash. It is the dark
+        // background; the light theme still paints the page itself.
         Meta { name: "theme-color", content: "#0a0a0b" }
         Meta { name: "mobile-web-app-capable", content: "yes" }
         Meta { name: "apple-mobile-web-app-capable", content: "yes" }
@@ -664,6 +667,69 @@ fn get_auth_token_from_window() {
 
 #[cfg(test)]
 mod tests {
+    /// The install manifest has to name PNG icons whose pixels match the
+    /// declared size, at paths that stay inside the contract prefix. A
+    /// leading slash would fetch them from the node root. `id: "./"` is not
+    /// a stable identity, so the manifest leaves `id` unset and `start_url`
+    /// fills that role.
+    #[test]
+    fn the_web_app_manifest_matches_the_png_icons_and_the_document_links() {
+        let manifest: serde_json::Value =
+            serde_json::from_str(include_str!("../../public/manifest.webmanifest"))
+                .expect("manifest.webmanifest is not JSON");
+        assert_eq!(manifest["name"], "River");
+        assert_eq!(manifest["short_name"], "River");
+        assert_eq!(manifest["display"], "standalone");
+        assert_eq!(manifest["start_url"], "./");
+        assert_eq!(manifest["scope"], "./");
+        assert_eq!(manifest["background_color"], "#0a0a0b");
+        assert_eq!(manifest["theme_color"], "#0a0a0b");
+        assert!(manifest.get("id").is_none(), "manifest id must stay unset");
+
+        let icons = manifest["icons"]
+            .as_array()
+            .expect("manifest icons must be an array");
+        assert!(
+            icons.iter().any(|icon| icon["sizes"] == "192x192")
+                && icons
+                    .iter()
+                    .any(|icon| icon["sizes"] == "512x512" && icon["purpose"] == "maskable"),
+            "install needs a 192 icon and a maskable 512 icon"
+        );
+        for icon in icons {
+            let src = icon["src"].as_str().expect("icon src");
+            assert!(
+                !src.starts_with('/'),
+                "icon {src} escapes the contract prefix"
+            );
+            let declared = icon["sizes"].as_str().expect("icon sizes");
+            let (width, height) = declared.split_once('x').expect("sizes WxH");
+            let bytes: &[u8] = match src {
+                "icons/icon-192.png" => include_bytes!("../../public/icons/icon-192.png"),
+                "icons/icon-512.png" => include_bytes!("../../public/icons/icon-512.png"),
+                other => panic!("manifest names an icon the test does not know: {other}"),
+            };
+            assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n", "{src} is not a PNG");
+            let file_width = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
+            let file_height = u32::from_be_bytes(bytes[20..24].try_into().unwrap());
+            assert_eq!(file_width.to_string(), width, "{src} width");
+            assert_eq!(file_height.to_string(), height, "{src} height");
+        }
+
+        let apple: &[u8] = include_bytes!("../../public/icons/apple-touch-icon.png");
+        assert_eq!(&apple[..8], b"\x89PNG\r\n\x1a\n");
+        assert_eq!(u32::from_be_bytes(apple[16..20].try_into().unwrap()), 180);
+        assert_eq!(u32::from_be_bytes(apple[20..24].try_into().unwrap()), 180);
+
+        let app = include_str!("app.rs");
+        assert!(app.contains("rel: \"manifest\""));
+        assert!(app.contains("manifest.webmanifest"));
+        assert!(app.contains("rel: \"apple-touch-icon\""));
+        assert!(app.contains("icons/apple-touch-icon.png"));
+        assert!(app.contains("name: \"theme-color\""));
+        assert!(app.contains("#0a0a0b"));
+    }
+
     // -----------------------------------------------------------------
     // Issue freenet/river#279 regression guard:
     //
