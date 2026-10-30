@@ -176,6 +176,24 @@ html, body {
   color: var(--color-text);
 }
 
+/* The Android on-screen keyboard can leave the strip below the fixed
+   `.app-root` unpainted, which shows as a white band between the composer
+   and the keyboard. Paint behind the app past every edge so the document
+   itself is never white. The negative box also covers the visual viewport
+   while the keyboard shifts it. */
+html::before {
+  content: "";
+  position: fixed;
+  inset: -100vh -100vw;
+  background-color: var(--color-bg);
+  z-index: -1;
+  pointer-events: none;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
 /* Paragraph spacing in prose (Markdown messages).
    Tailwind v4's Preflight reset zeroes margins on every element, so the
    <p> blocks the Markdown renderer emits for blank-line-separated
@@ -293,6 +311,7 @@ html, body {
 .app-root {
   position: fixed;
   inset: 0;
+  background-color: var(--color-bg);
   /* The width the breakpoints read: narrowing the window, Chromium briefly
      lays `inset: 0` out at the old width, and that one reflow moved a reader
      held at the end. The root never scrolls, so 100vw is the viewport. */
