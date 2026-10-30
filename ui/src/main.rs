@@ -54,7 +54,28 @@ unsafe extern "Rust" fn __getrandom_v02_custom(
     }
 }
 
+/// Android with the on-screen keyboard: by default the layout viewport keeps
+/// its full height while the keyboard covers its bottom, which leaves the
+/// area between the composer and the keyboard unpainted. `resizes-content`
+/// makes the layout shrink with the keyboard, so the flex column ends at the
+/// keyboard. `viewport-fit=cover` keeps the safe-area painting consistent.
+#[cfg(target_arch = "wasm32")]
+fn configure_mobile_viewport() {
+    let Some(document) = web_sys::window().and_then(|window| window.document()) else {
+        return;
+    };
+    let Ok(Some(meta)) = document.query_selector("meta[name=viewport]") else {
+        return;
+    };
+    let _ = meta.set_attribute(
+        "content",
+        "width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content",
+    );
+}
+
 fn main() {
+    #[cfg(target_arch = "wasm32")]
+    configure_mobile_viewport();
     dioxus::logger::initialize_default();
 
     #[cfg(target_arch = "wasm32")]
